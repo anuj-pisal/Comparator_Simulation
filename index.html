@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Op-Amp Comparator Lab | Interactive Simulator</title>
+  <meta name="description" content="Interactive visual simulator of an Op-Amp Comparator circuit with real-time SVG circuit animation, CRT oscilloscope, and Schmitt trigger hysteresis.">
+  
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="4 2 20 12 4 22 4 2"></polygon>
+            <line x1="8" y1="8" x2="10" y2="8"></line>
+            <line x1="8" y1="16" x2="10" y2="16"></line>
+            <line x1="9" y1="15" x2="9" y2="17"></line>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">
+            Comparator Lab
+            <span class="brand-tag">Op-Amp Simulator</span>
+          </div>
+          <div class="brand-subtitle">Interactive visual electronics lab: inverting comparator with hysteresis</div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Preset Dropdown -->
+        <select id="preset-select" class="select-custom" aria-label="Load preset simulation scenario">
+          <option value="default">Presets: Manual Learning</option>
+          <option value="zero-crossing">Preset: Zero-Crossing Detector</option>
+          <option value="light-sensor">Preset: Light Sensor Threshold</option>
+          <option value="noisy-hysteresis">Preset: Noisy Input Signal</option>
+          <option value="pwm-generator">Preset: Triangle Pulse Generator</option>
+        </select>
+
+        <!-- Mode Toggle -->
+        <div class="toggle-row" style="padding: 4px 10px; gap: 8px;">
+          <span id="mode-text" style="font-size: 0.78rem; font-weight: 600; color: var(--accent);">Inverting (−)</span>
+          <label class="toggle-switch" title="Toggle between Inverting (−) and Non-Inverting (+) comparator">
+            <input type="checkbox" id="mode-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Play / Pause -->
+        <button id="btn-pause" class="btn" title="Pause or Resume simulation">
+          <svg id="icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+            <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+          </svg>
+          <span id="text-pause">Pause</span>
+        </button>
+
+        <!-- Reset Counters -->
+        <button id="btn-reset" class="btn" title="Reset transition counters and time">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+          <span>Reset</span>
+        </button>
+
+        <!-- Info Modal Trigger -->
+        <button id="btn-info" class="btn btn-icon-only" title="How the comparator works">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Onboarding Hint Banner -->
+    <div id="onboarding-banner" class="onboarding-banner">
+      <div class="onboarding-text">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <span><strong>Quick Start:</strong> Drag the <strong>Vin slider</strong> past <strong>Vref (2.50V)</strong> to watch the output instantly switch between HIGH and LOW! Try switching to Sine or Triangle to view square-wave conversion.</span>
+      </div>
+      <button id="btn-dismiss-banner" class="banner-close-btn" title="Dismiss notice">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Main Grid: Circuit (Left) & Controls (Right) -->
+    <main class="dashboard-grid-top">
+      <!-- Circuit Panel -->
+      <section class="glass-panel circuit-panel" aria-label="Interactive Op-Amp Circuit Diagram">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <h2 class="panel-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="20" rx="4"></rect>
+                <path d="M7 12h10"></path>
+                <path d="M12 7v10"></path>
+              </svg>
+              Circuit Diagram & Live State
+            </h2>
+          </div>
+          <!-- Live State Badge -->
+          <div id="circuit-state-badge" class="state-badge state-high" aria-live="polite">
+            <span class="badge-dot">●</span>
+            <span id="badge-text">Vin &lt; Vref → HIGH</span>
+          </div>
+        </div>
+
+        <div class="circuit-canvas-wrap">
+          <svg id="circuit-svg" viewBox="0 0 820 440" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <!-- Glow Filters -->
+              <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3.5" result="blur"></feGaussianBlur>
+                <feMerge>
+                  <feMergeNode in="blur"></feMergeNode>
+                  <feMergeNode in="SourceGraphic"></feMergeNode>
+                </feMerge>
+              </filter>
+              <filter id="glow-amber" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3.5" result="blur"></feGaussianBlur>
+                <feMerge>
+                  <feMergeNode in="blur"></feMergeNode>
+                  <feMergeNode in="SourceGraphic"></feMergeNode>
+                </feMerge>
+              </filter>
+              <filter id="glow-output" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="5" result="blur"></feGaussianBlur>
+                <feMerge>
+                  <feMergeNode in="blur"></feMergeNode>
+                  <feMergeNode in="SourceGraphic"></feMergeNode>
+                </feMerge>
+              </filter>
+              <filter id="led-bloom" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="8" result="blur"></feGaussianBlur>
+                <feMerge>
+                  <feMergeNode in="blur"></feMergeNode>
+                  <feMergeNode in="SourceGraphic"></feMergeNode>
+                </feMerge>
+              </filter>
+
+              <!-- Linear Gradients for Wires -->
+              <linearGradient id="grad-vcc" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#fb923c" stop-opacity="1"></stop>
+                <stop offset="100%" stop-color="#ea580c" stop-opacity="0.8"></stop>
+              </linearGradient>
+            </defs>
+
+            <!-- Background Grid Lines in SVG -->
+            <g stroke="rgba(255,255,255,0.025)" stroke-width="1">
+              <line x1="0" y1="110" x2="820" y2="110"></line>
+              <line x1="0" y1="220" x2="820" y2="220"></line>
+              <line x1="0" y1="330" x2="820" y2="330"></line>
+              <line x1="205" y1="0" x2="205" y2="440"></line>
+              <line x1="410" y1="0" x2="410" y2="440"></line>
+              <line x1="615" y1="0" x2="615" y2="440"></line>
+            </g>
+
+            <!-- Power Rail Wires: +VCC (Top) & GND (Bottom) -->
+            <!-- +VCC Supply Pin -->
+            <path id="wire-vcc" d="M 440,50 L 440,140" stroke="#fb923c" stroke-width="3" stroke-linecap="round"></path>
+            <circle cx="440" cy="50" r="5" fill="#fb923c"></circle>
+            <text x="440" y="38" fill="#fb923c" font-size="13" font-family="'JetBrains Mono', monospace" font-weight="700" text-anchor="middle">+VCC (<tspan id="svg-vcc-val">5.0V</tspan>)</text>
+
+            <!-- GND Supply Pin -->
+            <path id="wire-gnd" d="M 440,300 L 440,390" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"></path>
+            <!-- Ground Symbol -->
+            <line x1="424" y1="390" x2="456" y2="390" stroke="#94a3b8" stroke-width="3" stroke-linecap="round"></line>
+            <line x1="430" y1="397" x2="450" y2="397" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"></line>
+            <line x1="436" y1="404" x2="444" y2="404" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"></line>
+            <text x="466" y="398" fill="#94a3b8" font-size="12" font-family="'JetBrains Mono', monospace" font-weight="600">GND (0V)</text>
+
+            <!-- Input Wires -->
+            <!-- Top Input Wire (default: Vin to minus pin) -->
+            <path id="wire-in-top" d="M 90,160 L 350,160" stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round" filter="url(#glow-cyan)"></path>
+            <!-- Bottom Input Wire (default: Vref to plus pin) -->
+            <path id="wire-in-bot" d="M 90,280 L 350,280" stroke="#fbbf24" stroke-width="3.5" stroke-linecap="round" filter="url(#glow-amber)"></path>
+
+            <!-- Output Wire -->
+            <path id="wire-out" d="M 530,220 L 710,220" stroke="#34d399" stroke-width="4" stroke-linecap="round" filter="url(#glow-output)"></path>
+
+            <!-- Animated Flow Particle Groups (dynamically positioned by JS) -->
+            <g id="particles-in-top"></g>
+            <g id="particles-in-bot"></g>
+            <g id="particles-out"></g>
+
+            <!-- Op-Amp Triangle Body -->
+            <polygon id="opamp-body" points="350,110 530,220 350,330" fill="rgba(15, 23, 42, 0.9)" stroke="#34d399" stroke-width="3" stroke-linejoin="round" filter="url(#glow-output)"></polygon>
+
+            <!-- Terminal Symbols (+ and -) -->
+            <!-- Top Terminal Sign -->
+            <g id="terminal-top" transform="translate(365, 160)">
+              <line x1="-7" y1="0" x2="7" y2="0" stroke="#ffffff" stroke-width="3" stroke-linecap="round"></line>
+              <line id="terminal-top-vert" x1="0" y1="-7" x2="0" y2="7" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0"></line>
+            </g>
+            <!-- Bottom Terminal Sign -->
+            <g id="terminal-bot" transform="translate(365, 280)">
+              <line x1="-7" y1="0" x2="7" y2="0" stroke="#ffffff" stroke-width="3" stroke-linecap="round"></line>
+              <line id="terminal-bot-vert" x1="0" y1="-7" x2="0" y2="7" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="1"></line>
+            </g>
+
+            <!-- Op-Amp Center Label -->
+            <text x="415" y="225" fill="rgba(255,255,255,0.7)" font-size="16" font-family="'Inter', sans-serif" font-weight="700" text-anchor="middle">OP-AMP</text>
+            <text x="415" y="244" fill="var(--text-dim)" font-size="11" font-family="'JetBrains Mono', monospace" text-anchor="middle">No Feedback</text>
+
+            <!-- Crossing Ripple Ring (Flashes on threshold transition) -->
+            <circle id="crossing-ripple" cx="440" cy="220" r="10" fill="none" stroke="#38bdf8" stroke-width="2" opacity="0"></circle>
+
+            <!-- Wire Voltage Floating Badges & Labels -->
+            <!-- Top Input Label -->
+            <g id="label-in-top" transform="translate(140, 140)">
+              <rect x="-8" y="-18" width="130" height="26" rx="6" fill="#0b1329" stroke="#22d3ee" stroke-width="1.5"></rect>
+              <text id="text-in-top" x="57" y="-2" fill="#22d3ee" font-size="13" font-family="'JetBrains Mono', monospace" font-weight="700" text-anchor="middle">Vin: 1.00 V</text>
+            </g>
+            <!-- Bottom Input Label -->
+            <g id="label-in-bot" transform="translate(140, 310)">
+              <rect x="-8" y="-18" width="130" height="26" rx="6" fill="#0b1329" stroke="#fbbf24" stroke-width="1.5"></rect>
+              <text id="text-in-bot" x="57" y="-2" fill="#fbbf24" font-size="13" font-family="'JetBrains Mono', monospace" font-weight="700" text-anchor="middle">Vref: 2.50 V</text>
+            </g>
+
+            <!-- Output Voltage Label -->
+            <g id="label-out" transform="translate(560, 195)">
+              <rect x="-8" y="-18" width="130" height="26" rx="6" fill="#0b1329" stroke="#34d399" stroke-width="1.5"></rect>
+              <text id="text-out" x="57" y="-2" fill="#34d399" font-size="13" font-family="'JetBrains Mono', monospace" font-weight="700" text-anchor="middle">Vout: 5.00 V</text>
+            </g>
+
+            <!-- Output LED Assembly -->
+            <g id="led-assembly" transform="translate(710, 220)">
+              <!-- LED Bloom Glow -->
+              <circle id="led-bloom-disc" cx="0" cy="0" r="22" fill="#34d399" opacity="0.35" filter="url(#led-bloom)"></circle>
+              <!-- LED Outer Ring -->
+              <circle cx="0" cy="0" r="15" fill="#1e293b" stroke="#34d399" stroke-width="2"></circle>
+              <!-- LED Core Diode -->
+              <circle id="led-core" cx="0" cy="0" r="9" fill="#34d399"></circle>
+              <!-- LED Reflection Specular -->
+              <ellipse cx="-3" cy="-3" rx="3.5" ry="2" fill="#ffffff" opacity="0.75"></ellipse>
+              <!-- LED Label -->
+              <text x="0" y="34" fill="#ffffff" font-size="12" font-family="'JetBrains Mono', monospace" font-weight="700" text-anchor="middle">LED</text>
+              <text id="led-state-text" x="0" y="49" fill="#34d399" font-size="11" font-family="'JetBrains Mono', monospace" font-weight="700" text-anchor="middle">ON (1)</text>
+            </g>
+
+            <!-- Comparison Mini-Gauge (SVG Embedded inside bottom left) -->
+            <g id="svg-mini-gauge" transform="translate(20, 175)">
+              <rect x="0" y="0" width="70" height="90" rx="8" fill="rgba(10, 15, 26, 0.9)" stroke="rgba(255,255,255,0.1)" stroke-width="1"></rect>
+              <text x="35" y="14" fill="var(--text-muted)" font-size="9" font-family="'Inter', sans-serif" font-weight="600" text-anchor="middle">COMPARE</text>
+              
+              <!-- Vin Bar -->
+              <rect x="12" y="24" width="12" height="48" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.1)"></rect>
+              <rect id="gauge-bar-vin" x="12" y="44" width="12" height="28" rx="2" fill="#22d3ee"></rect>
+              <text x="18" y="82" fill="#22d3ee" font-size="8.5" font-family="'JetBrains Mono', monospace" text-anchor="middle">Vin</text>
+
+              <!-- Relational operator (< or >) -->
+              <text id="gauge-symbol" x="35" y="52" fill="#ffffff" font-size="16" font-family="'JetBrains Mono', monospace" font-weight="800" text-anchor="middle">&lt;</text>
+
+              <!-- Vref Bar -->
+              <rect x="46" y="24" width="12" height="48" rx="2" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.1)"></rect>
+              <rect id="gauge-bar-vref" x="46" y="36" width="12" height="36" rx="2" fill="#fbbf24"></rect>
+              <text x="52" y="82" fill="#fbbf24" font-size="8.5" font-family="'JetBrains Mono', monospace" text-anchor="middle">Vref</text>
+            </g>
+          </svg>
+        </div>
+      </section>
+
+      <!-- Control Panel -->
+      <section class="glass-panel controls-panel" aria-label="Simulation Parameter Controls">
+        <div class="panel-header" style="margin-bottom: 4px;">
+          <h2 class="panel-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="4" y1="21" x2="4" y2="14"></line>
+              <line x1="4" y1="10" x2="4" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="3"></line>
+              <line x1="20" y1="21" x2="20" y2="16"></line>
+              <line x1="20" y1="12" x2="20" y2="3"></line>
+              <line x1="1" y1="14" x2="7" y2="14"></line>
+              <line x1="9" y1="8" x2="15" y2="8"></line>
+              <line x1="17" y1="16" x2="23" y2="16"></line>
+            </svg>
+            Signal & Supply Controls
+          </h2>
+        </div>
+
+        <!-- Vin Source Selector Tabs -->
+        <div class="controls-section">
+          <div class="controls-section-title">
+            <span>Vin Source Mode</span>
+            <span id="current-mode-tag" style="color: var(--vin); font-size: 0.72rem;">Manual Potentiometer</span>
+          </div>
+          <div class="segmented-control" id="vin-source-tabs" role="tablist">
+            <button class="segment-btn active" data-source="manual" role="tab" aria-selected="true">Manual</button>
+            <button class="segment-btn" data-source="sine" role="tab" aria-selected="false">Sine</button>
+            <button class="segment-btn" data-source="triangle" role="tab" aria-selected="false">Triangle</button>
+            <button class="segment-btn" data-source="ramp" role="tab" aria-selected="false">Ramp</button>
+            <button class="segment-btn" data-source="square" role="tab" aria-selected="false">Square</button>
+          </div>
+        </div>
+
+        <!-- Sliders: Main Voltages -->
+        <div class="controls-section">
+          <!-- Vin Manual Slider -->
+          <div class="control-group" id="group-vin-manual">
+            <div class="control-label-row">
+              <label for="slider-vin" class="control-label">
+                <span class="control-color-dot" style="background: var(--vin);"></span>
+                Vin (Manual Input Voltage)
+              </label>
+              <span id="val-vin" class="control-value">1.00 V</span>
+            </div>
+            <div class="slider-container">
+              <input type="range" id="slider-vin" class="custom-slider slider-vin" min="0" max="5.0" step="0.01" value="1.00">
+            </div>
+          </div>
+
+          <!-- Vref Slider -->
+          <div class="control-group" id="group-vref">
+            <div class="control-label-row">
+              <label for="slider-vref" class="control-label">
+                <span class="control-color-dot" style="background: var(--vref);"></span>
+                Vref (Reference Voltage)
+              </label>
+              <span id="val-vref" class="control-value">2.50 V</span>
+            </div>
+            <div class="slider-container">
+              <input type="range" id="slider-vref" class="custom-slider slider-vref" min="0" max="5.0" step="0.05" value="2.50">
+            </div>
+          </div>
+
+          <!-- Waveform Parameter Controls (active when not in manual mode) -->
+          <div id="waveform-controls" style="display: none; flex-direction: column; gap: 8px;">
+            <!-- Amplitude -->
+            <div class="control-group">
+              <div class="control-label-row">
+                <label for="slider-amp" class="control-label">Peak Amplitude (A)</label>
+                <span id="val-amp" class="control-value">2.00 V</span>
+              </div>
+              <div class="slider-container">
+                <input type="range" id="slider-amp" class="custom-slider" min="0.1" max="2.5" step="0.05" value="2.00">
+              </div>
+            </div>
+
+            <!-- DC Offset -->
+            <div class="control-group">
+              <div class="control-label-row">
+                <label for="slider-offset" class="control-label">DC Offset</label>
+                <span id="val-offset" class="control-value">2.50 V</span>
+              </div>
+              <div class="slider-container">
+                <input type="range" id="slider-offset" class="custom-slider" min="0" max="5.0" step="0.05" value="2.50">
+              </div>
+            </div>
+
+            <!-- Frequency -->
+            <div class="control-group">
+              <div class="control-label-row">
+                <label for="slider-freq" class="control-label">Frequency (f)</label>
+                <span id="val-freq" class="control-value">0.5 Hz</span>
+              </div>
+              <div class="slider-container">
+                <input type="range" id="slider-freq" class="custom-slider" min="0.1" max="5.0" step="0.1" value="0.5">
+              </div>
+            </div>
+          </div>
+
+          <!-- Noise Generator Slider -->
+          <div class="control-group">
+            <div class="control-label-row">
+              <label for="slider-noise" class="control-label">Signal Noise Jitter (mV)</label>
+              <span id="val-noise" class="control-value">0 mV</span>
+            </div>
+            <div class="slider-container">
+              <input type="range" id="slider-noise" class="custom-slider" min="0" max="500" step="10" value="0">
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <!-- Oscilloscope Panel -->
+    <section class="glass-panel scope-panel" aria-label="Real-time Oscilloscope Waveform Display">
+      <div class="panel-header">
+        <div class="panel-title-wrap">
+          <h2 class="panel-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            Live Oscilloscope Traces
+          </h2>
+        </div>
+
+        <div class="scope-header-controls">
+          <!-- Time Window Selector -->
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="scope-window-select" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500;">Time Window:</label>
+            <select id="scope-window-select" class="select-custom" style="padding: 4px 10px; font-size: 0.76rem;">
+              <option value="4">4 Seconds</option>
+              <option value="8" selected>8 Seconds</option>
+              <option value="12">12 Seconds</option>
+              <option value="20">20 Seconds</option>
+            </select>
+          </div>
+
+          <!-- Trace Visibility Toggles / Legend -->
+          <div class="scope-legend">
+            <label class="legend-item" title="Toggle Vin waveform trace">
+              <input type="checkbox" id="trace-vin-toggle" checked style="accent-color: var(--vin); cursor: pointer;">
+              <span class="legend-dot" style="background: var(--vin);"></span>
+              <span>Vin</span>
+            </label>
+            <label class="legend-item" title="Toggle Vref reference threshold line">
+              <input type="checkbox" id="trace-vref-toggle" checked style="accent-color: var(--vref); cursor: pointer;">
+              <span class="legend-dot" style="background: var(--vref);"></span>
+              <span>Vref</span>
+            </label>
+            <label class="legend-item" title="Toggle Vout output waveform trace">
+              <input type="checkbox" id="trace-vout-toggle" checked style="accent-color: var(--high); cursor: pointer;">
+              <span class="legend-dot" style="background: var(--high);"></span>
+              <span>Vout</span>
+            </label>
+            <label class="legend-item" title="Toggle shaded cause-and-effect transition background">
+              <input type="checkbox" id="trace-shade-toggle" checked style="cursor: pointer;">
+              <span>Cause Regions</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="scope-canvas-container" id="scope-container">
+        <canvas id="scope-canvas"></canvas>
+      </div>
+    </section>
+
+    <!-- Derived Readout Cards Row -->
+    <section class="readouts-grid" aria-label="Live Voltage and State Telemetry">
+      <!-- Vin Card -->
+      <div class="readout-card">
+        <div class="readout-label">
+          <span>Input Vin</span>
+          <span style="color: var(--vin);">●</span>
+        </div>
+        <div class="readout-value">
+          <span id="tele-vin">1.00</span>
+          <span class="readout-unit">V</span>
+        </div>
+        <div class="readout-sub" id="tele-vin-type">Manual Source</div>
+      </div>
+
+      <!-- Vref Card -->
+      <div class="readout-card">
+        <div class="readout-label">
+          <span>Reference Vref</span>
+          <span style="color: var(--vref);">●</span>
+        </div>
+        <div class="readout-value">
+          <span id="tele-vref">2.50</span>
+          <span class="readout-unit">V</span>
+        </div>
+        <div class="readout-sub" id="tele-vref-sub">Threshold boundary</div>
+      </div>
+
+      <!-- Differential Card -->
+      <div class="readout-card">
+        <div class="readout-label">
+          <span>Differential (Vin − Vref)</span>
+          <span style="color: var(--accent);">ΔV</span>
+        </div>
+        <div class="readout-value">
+          <span id="tele-diff">-1.50</span>
+          <span class="readout-unit">V</span>
+        </div>
+        <div class="readout-sub" id="tele-diff-dir">Vin is below Vref</div>
+      </div>
+
+      <!-- Vout Card -->
+      <div class="readout-card">
+        <div class="readout-label">
+          <span>Output Vout</span>
+          <span id="tele-vout-dot" style="color: var(--high);">●</span>
+        </div>
+        <div class="readout-value">
+          <span id="tele-vout">5.00</span>
+          <span class="readout-unit">V</span>
+        </div>
+        <div class="readout-sub" id="tele-vout-rail">Saturated at +VCC</div>
+      </div>
+
+      <!-- Logic & Transitions Card -->
+      <div class="readout-card">
+        <div class="readout-label">
+          <span>State &amp; Flips</span>
+          <span id="tele-logic-pill" class="badge" style="background: rgba(52, 211, 153, 0.2); color: var(--high);">HIGH (1)</span>
+        </div>
+        <div class="readout-value">
+          <span id="tele-transitions">0</span>
+          <span class="readout-unit" style="font-size: 0.8rem;">transitions</span>
+        </div>
+        <div class="readout-sub" id="tele-rule-text">Rule: Vin &lt; Vref → HIGH</div>
+      </div>
+    </section>
+
+    <!-- Educational Modal Dialog -->
+    <div id="info-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h2 id="modal-title" style="font-size: 1.25rem;">How an Op-Amp Comparator Works</h2>
+          <button id="btn-close-modal" class="banner-close-btn" style="padding: 6px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div style="color: var(--text-muted); display: flex; flex-direction: column; gap: 14px; font-size: 0.88rem; line-height: 1.6;">
+          <p>
+            An **operational amplifier (op-amp)** operating without negative feedback has astronomical open-loop gain (typically $A_{OL} \ge 100{,}000$). Because of this immense gain, any minute difference between its input terminals drives the output directly into one of the power supply saturation rails.
+          </p>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 8px; padding: 12px 16px;">
+            <strong style="color: #fff;">Inverting Comparator Rule:</strong>
+            <ul style="margin-left: 20px; margin-top: 6px;">
+              <li><strong style="color: var(--high);">Vin &lt; Vref:</strong> Output is pulled <strong>HIGH</strong> ($\approx +V_{CC}$, Logic 1).</li>
+              <li><strong style="color: var(--low);">Vin &gt; Vref:</strong> Output is pulled <strong>LOW</strong> ($\approx 0\text{V}$, Logic 0).</li>
+            </ul>
+          </div>
+          <p>
+            <strong>Schmitt Trigger Hysteresis:</strong> In real physical systems, electrical noise near $V_{in} = V_{ref}$ can cause rapid, chaotic output flickering (chatter). Adding hysteresis creates two distinct switching thresholds ($V_{upper}$ and $V_{lower}$), preventing noise spikes from creating false transitions.
+          </p>
+          <p>
+            <strong>Interactive Tip:</strong> Use the <em>Preset: Noisy Signal + Hysteresis</em> to see firsthand how hysteresis cleanly eliminates noisy multiple transitions!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boot Module -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
